@@ -1,0 +1,60 @@
+x-telemetry: &telemetry
+  OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-otlp}
+  OTEL_METRICS_EXPORTER: ${OTEL_METRICS_EXPORTER:-otlp}
+  OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER:-otlp}
+  OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}
+  OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+  OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED: "true"
+  OTEL_PYTHON_DISABLED_INSTRUMENTATIONS: fastapi,starlette,asgi
+  OTEL_METRIC_EXPORT_INTERVAL: ${OTEL_METRIC_EXPORT_INTERVAL:-5000}
+  OTEL_BSP_SCHEDULE_DELAY: "1000"
+  OTEL_BLRP_SCHEDULE_DELAY: "1000"
+  OTEL_TRACES_SAMPLER: always_on
+  OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment.name=advent-demo,service.version=0.1.0}
+
+services:
+  workshop:
+    build: .
+    image: santa-workshop-demo:local
+    command: ["santa-workshop"]
+    environment:
+      <<: *telemetry
+      OTEL_SERVICE_NAME: santa-workshop-api
+      WORKSHOP_HOST: 0.0.0.0
+      PORT: "8001"
+      PAINT_DELAY_SECONDS: ${PAINT_DELAY_SECONDS:-2}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  mcp:
+    build: .
+    image: santa-workshop-demo:local
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      workshop:
+        condition: service_healthy
+    environment:
+      <<: *telemetry
+      OTEL_SERVICE_NAME: santa-mcp
+      WORKSHOP_URL: http://workshop:8001
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-}
+      ELASTICSEARCH_API_KEY: ${ELASTICSEARCH_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  traffic:
+    image: santa-workshop-demo:local
+    profiles: ["tools"]
+    entrypoint: ["santa-traffic"]
+    command: ["--url", "http://mcp:8000/mcp"]
+    depends_on:
+      mcp:
+        condition: service_healthy

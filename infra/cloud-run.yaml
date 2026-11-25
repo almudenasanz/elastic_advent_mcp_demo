@@ -1,0 +1,59 @@
+# Optional private service. Replace both image URLs before deployment.
+# Configure the OTLP endpoint, ingestion headers via Secret Manager, and Elastic
+# search settings before deployment. All three telemetry signals are enabled.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: santa-workshop
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/container-dependencies: '{"mcp":["workshop"]}'
+    spec:
+      containerConcurrency: 20
+      timeoutSeconds: 300
+      containers:
+        - name: mcp
+          image: REGION-docker.pkg.dev/PROJECT/REPOSITORY/santa-demo:0.1.0
+          command: ["opentelemetry-instrument"]
+          args: ["santa-mcp", "--host", "0.0.0.0", "--port", "8080"]
+          ports:
+            - containerPort: 8080
+          env:
+            - {name: ELASTICSEARCH_URL, value: "https://<your-elasticsearch-endpoint>"}
+            - name: ELASTICSEARCH_API_KEY
+              valueFrom:
+                secretKeyRef: {name: santa-elasticsearch-api-key, key: latest}
+            - {name: WORKSHOP_URL, value: "http://127.0.0.1:8001"}
+            - {name: OTEL_SERVICE_NAME, value: santa-mcp}
+            - {name: OTEL_TRACES_EXPORTER, value: otlp}
+            - {name: OTEL_METRICS_EXPORTER, value: otlp}
+            - {name: OTEL_LOGS_EXPORTER, value: otlp}
+            - {name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf}
+            - {name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: "true"}
+            - {name: OTEL_PYTHON_DISABLED_INSTRUMENTATIONS, value: "fastapi,starlette,asgi"}
+          resources:
+            limits: {cpu: "1", memory: 512Mi}
+          startupProbe:
+            tcpSocket: {port: 8080}
+        - name: workshop
+          image: REGION-docker.pkg.dev/PROJECT/REPOSITORY/santa-demo:0.1.0
+          command: ["opentelemetry-instrument"]
+          args: ["santa-workshop"]
+          env:
+            - {name: WORKSHOP_HOST, value: "0.0.0.0"}
+            - {name: PORT, value: "8001"}
+            - {name: OTEL_SERVICE_NAME, value: santa-workshop-api}
+            - {name: OTEL_TRACES_EXPORTER, value: otlp}
+            - {name: OTEL_METRICS_EXPORTER, value: otlp}
+            - {name: OTEL_LOGS_EXPORTER, value: otlp}
+            - {name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf}
+            - {name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED, value: "true"}
+            - {name: OTEL_PYTHON_DISABLED_INSTRUMENTATIONS, value: "fastapi,starlette,asgi"}
+          resources:
+            limits: {cpu: "1", memory: 512Mi}
+          startupProbe:
+            tcpSocket: {port: 8001}

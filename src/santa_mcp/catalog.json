@@ -1,0 +1,20 @@
+[
+  {
+    "toy_id": "teddy-bear",
+    "name": "Teddy bear",
+    "instructions": "Cut the fabric, stitch the body, add stuffing, attach the ribbon, and wrap the bear.",
+    "parts": {"fabric": 2, "stuffing": 1, "ribbon": 1}
+  },
+  {
+    "toy_id": "wooden-train",
+    "name": "Wooden train",
+    "instructions": "Assemble the wooden carriage, attach four wheels, paint it red in the paint booth, and wrap the train.",
+    "parts": {"wood": 2, "wheels": 4, "paint": 1}
+  },
+  {
+    "toy_id": "rocking-horse",
+    "name": "Rocking horse",
+    "instructions": "Shape the wooden body, attach the rockers, finish with magic varnish, and wrap the horse.",
+    "parts": {"wood": 4, "magic-varnish": 1}
+  }
+]
